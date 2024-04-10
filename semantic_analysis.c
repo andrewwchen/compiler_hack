@@ -42,6 +42,15 @@ int perform_analysis_on_val(astNode *node, vector<char*> *decl_list) {
 		case ast_cnst: {
             return 0;
 		}
+		case ast_uexpr: {
+            if (node->uexpr.expr->type == ast_var) {
+                if (vector_contains(decl_list, node->uexpr.expr->var.name) == 0) {
+                    printf("%s referenced before declaration\n", node->uexpr.expr->var.name);
+                    return -1;
+                }
+            }
+            return 0;
+		}
 		case ast_bexpr: {
             if (node->bexpr.lhs->type == ast_var) {
                 if (vector_contains(decl_list, node->bexpr.lhs->var.name) == 0) {
