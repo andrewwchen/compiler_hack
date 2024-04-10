@@ -41,8 +41,8 @@ int yyerror(astNode** rootAstPtr, const char *);
 prog : extern_print extern_read func {*rootAstPtr = createProg($1, $2, $3);}
 extern_print : EXTERN VOID PRINT '(' INT ')' ';' {$$ = createExtern("print");}
 extern_read : EXTERN INT READ '(' ')' ';' {$$ = createExtern("read");}
-func : INT NAME '(' INT var ')' stmt {$$ = createFunc($2, $5, $7); free($2);}
-	 | INT NAME '(' ')' stmt {$$ = createFunc($2, NULL, $5); free($2);}
+func : INT NAME '(' INT var ')' block {$$ = createFunc($2, $5, $7); free($2);}
+	 | INT NAME '(' ')' block {$$ = createFunc($2, NULL, $5); free($2);}
 var : NAME {$$ = createVar($1); free($1);}
 cnst: NUM {$$ = createCnst($1);}
 var_cnst : var {$$ = $1;}
