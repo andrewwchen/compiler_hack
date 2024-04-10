@@ -2,7 +2,7 @@
 #include<stdio.h>
 #include"ast.h"
 #include "y.tab.h"
-extern int yyerror(char *);
+extern int yyerror(astNode** rootAstPtr, const char *);
 %}
 %%
 extern 	{ return EXTERN;}
