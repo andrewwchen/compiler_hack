@@ -4,7 +4,6 @@ frontend/y.tab.h
 frontend/lex.yy.c
 frontend/frontend.out
 optimization/llvm_parser
-optimization/llvm_parser.o
 optimization/test_new.ll
 optimization/test.ll
 # Prerequisites
