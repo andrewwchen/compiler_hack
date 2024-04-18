@@ -19,6 +19,8 @@ LLVMModuleRef createLLVMModel(char * filename){
 
 	LLVMCreateMemoryBufferWithContentsOfFile(filename, &ll_f, &err);
 
+	//LLVMDisposeMemoryBuffer(ll_f);
+
 	if (err != NULL) { 
 		prt(err);
 		return NULL;
@@ -28,6 +30,7 @@ LLVMModuleRef createLLVMModel(char * filename){
 
 	if (err != NULL) {
 		prt(err);
+		//LLVMDisposeMessage(err);
 	}
 
 	return m;
@@ -223,6 +226,7 @@ int main(int argc, char** argv)
 		walkGlobalValues(m);
 		walkFunctions(m);
 		LLVMPrintModuleToFile (m, "test_new.ll", NULL);
+		//LLVMDisposeModule(m);
 	}
 	else {
 	    fprintf(stderr, "m is NULL\n");
