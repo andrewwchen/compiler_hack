@@ -5,11 +5,16 @@ int func(int p){
 	int a;
 	int b;
 	int c1;
-	int c2;
 	a = 10;
 	b = 20;
-	c1 = 10 + 20;
-  c2 = a + b;
+  	c1 = a + b;
+
+	if (a<p){
+		b = 30;
+	}
+	else {
+		b = c1;
+	}
 	
-	return c1;
+	return (b+a);
 }

@@ -5,7 +5,7 @@ frontend/lex.yy.c
 frontend/frontend.out
 optimization/llvm_parser
 optimization/test_new.ll
-optimization/test.ll
+optimization/opt_tests/test.ll
 # Prerequisites
 *.d
 

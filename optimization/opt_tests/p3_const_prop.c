@@ -7,7 +7,7 @@ int func(int p){
 	int c1;
 	a = 10;
 	b = 20;
-  c1 = a + b;
+  	c1 = a + b;
 
 	if (a<p){
 		b = 30;
