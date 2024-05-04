@@ -1,0 +1,1 @@
+int optimize_llvm(char* ll_file);

@@ -350,39 +350,21 @@ void walkFunctions(LLVMModuleRef module){
  	}
 }
 
-void walkGlobalValues(LLVMModuleRef module){
-	for (LLVMValueRef gVal =  LLVMGetFirstGlobal(module);
-                        gVal;
-                        gVal = LLVMGetNextGlobal(gVal)) {
-
-                const char* gName = LLVMGetValueName(gVal);
-                printf("Global variable name: %s\n", gName);
-        }
-}
-
-int main(int argc, char** argv)
+int optimize_llvm(char* ll_file)
 {
 	LLVMModuleRef m;
 
-	if (argc == 2){
-		m = createLLVMModel(argv[1]);
-	}
-	else{
-		m = NULL;
-		return 1;
-	}
+	m = createLLVMModel(ll_file);
 
 	if (m != NULL){
-		//LLVMDumpModule(m);
-		walkGlobalValues(m);
 		walkFunctions(m);
 		LLVMPrintModuleToFile (m, "test_new.ll", NULL);
 		LLVMDisposeModule(m);
 		LLVMShutdown();
+		return 0;
 	}
 	else {
 	    fprintf(stderr, "m is NULL\n");
+		return -1;
 	}
-	
-	return 0;
 }

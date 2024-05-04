@@ -1,11 +1,11 @@
 .vscode
-frontend/y.tab.c
-frontend/y.tab.h
-frontend/lex.yy.c
-frontend/frontend.out
-optimization/llvm_parser
-optimization/test_new.ll
-optimization/opt_tests/test.ll
+y.tab.c
+y.tab.h
+lex.yy.c
+test_new.ll
+test.ll
+*.o
+*.out
 # Prerequisites
 *.d
 

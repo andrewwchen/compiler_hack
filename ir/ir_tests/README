@@ -1,0 +1,2 @@
+test1: all variables have the corresponding alloc statment in the first basic block.
+test2: 
