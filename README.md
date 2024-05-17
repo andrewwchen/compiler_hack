@@ -9,5 +9,7 @@ make
 make clean
 ```
 creates "output_unoptimized.ll" from .c file
+
 creates "output_optimized.ll" from .ll file
+
 You can optimize the c file by setting .ll file to "output_unoptimized.ll"
