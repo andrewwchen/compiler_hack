@@ -127,7 +127,7 @@ bool elimDeadCode(LLVMBasicBlockRef bb) {
 		LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
 
 		// do not perform subexpression elimination on STORE, CALL, BRANCH, or RET
-		if (op == LLVMStore || op == LLVMCall || op == LLVMRet || op == LLVMBr) {
+		if (op == LLVMStore || op == LLVMCall || op == LLVMRet || op == LLVMBr || op == LLVMAlloca) {
 			continue;
 		}
 
@@ -358,7 +358,7 @@ int optimize_llvm(char* ll_file)
 
 	if (m != NULL){
 		walkFunctions(m);
-		LLVMPrintModuleToFile (m, "test_new.ll", NULL);
+		LLVMPrintModuleToFile (m, "output_optimized.ll", NULL);
 		LLVMDisposeModule(m);
 		LLVMShutdown();
 		return 0;

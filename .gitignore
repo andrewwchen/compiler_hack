@@ -2,8 +2,8 @@
 y.tab.c
 y.tab.h
 lex.yy.c
-test_new.ll
-test.ll
+output_unoptimized.ll
+output_optimized.ll
 *.o
 *.out
 # Prerequisites

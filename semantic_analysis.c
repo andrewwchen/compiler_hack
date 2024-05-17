@@ -46,7 +46,7 @@ int perform_analysis_on_val(astNode *node, char *func_param, vector<char*> *decl
             return 0;
 		}
 		default: {
-            printf("val has incorrect type (not read, var, cnst, or bexpr)\n");
+            printf("val has incorrect type (not read, var, cnst, uexpr, or bexpr)\n");
 			return -1;
 		}
 	}

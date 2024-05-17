@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include"ast.h"
+#include"ir.h"
 #include"semantic_analysis.h"
 #include"llvm_parser.h"
 
@@ -24,8 +25,12 @@ int main(int argc, char** argv)
     }
     astNode *rootAst;
     yyparse(&rootAst);
-    printNode(rootAst, 1);
+    //printNode(rootAst, 1);
     printf("static analysis result of .c file: %d\n", perform_analysis(rootAst));
+
+    printf("ir build result: %d\n", build_ir(rootAst, c_file));
+    //printNode(rootAst, 1);
+
     freeNode(rootAst);
     fclose(yyin);
     yylex_destroy();
