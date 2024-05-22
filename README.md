@@ -13,8 +13,12 @@ logic_similarity =  1 - (logic_difference / maximum_logic_difference)
 
 similarity = 80 * structure_similarity + 20 * logic_similarity 
 ```
+We first convert each miniC program into AST trees.
+We count and compare the frequencies of each node in each tree to clculate logic similarity.
 
-We used Tree Similarity Library (https://github.com/DatabaseGroup/tree-similarity) to calculate the tree edit distance.
+We then convert each AST tree into string bracket format.
+We then used Tree Similarity Library (https://github.com/DatabaseGroup/tree-similarity) to calculate the tree edit distance between the two trees in string bracket format.
+We use the tree edit distance to calculate structure similarity.
 
 
 ## Usage
