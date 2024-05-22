@@ -1,10 +1,10 @@
 TEST = opt_tests/test
 
-minic_compiler.out: llvm_parser.c ir.c semantic_analysis.c minic_compiler.c
+minic_compiler.out: llvm_parser.c ir.c semantic_analysis.c minic_compiler.c codegen.c
 	yacc -d -Wcounterexamples frontend.y 
 	lex frontend.l
 	g++ -g -I /usr/include/llvm-c-15/ -c llvm_parser.c
-	g++ -g lex.yy.c y.tab.c ast.c minic_compiler.c semantic_analysis.c ir.c -o minic_compiler.out llvm_parser.o `llvm-config-15 --cxxflags --ldflags --libs core` -I /usr/include/llvm-c-15/ -o $@
+	g++ -g lex.yy.c y.tab.c ast.c minic_compiler.c semantic_analysis.c ir.c codegen.c -o minic_compiler.out llvm_parser.o `llvm-config-15 --cxxflags --ldflags --libs core` -I /usr/include/llvm-c-15/ -o $@
 
 
 llvm_file: $(TEST).c

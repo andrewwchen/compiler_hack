@@ -1,370 +1,204 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <cstddef>
-#include <vector>
-#include <set>
+#include"ast.h"
+#include<stdio.h>
+#include<cstddef>
+
 #include <unordered_map> 
-#include <llvm-c/Core.h>
-#include <llvm-c/IRReader.h>
-#include <llvm-c/Types.h>
-using namespace std; 
+#include <cstring>
+#include <string.h>
+#include<vector>
+#include <algorithm>
+using namespace std;
 
-#define prt(x) if(x) { printf("%s\n", x); }
-
-/* This function reads the given llvm file and loads the LLVM IR into
-	 data-structures that we can works on for optimization phase.
-*/
- 
-LLVMModuleRef createLLVMModel(char * filename){
-	char *err = 0;
-
-	LLVMMemoryBufferRef ll_f = 0;
-	LLVMModuleRef m = 0;
-
-	LLVMCreateMemoryBufferWithContentsOfFile(filename, &ll_f, &err);
-
-	//LLVMDisposeMemoryBuffer(ll_f);
-
-	if (err != NULL) { 
-		prt(err);
-		return NULL;
-	}
-	
-	LLVMParseIRInContext(LLVMGetGlobalContext(), ll_f, &m, &err);
-
-	if (err != NULL) {
-		prt(err);
-		//LLVMDisposeMessage(err);
-	}
-
-	return m;
-}
-/*
-bool are_operands_equal(LLVMValueRef operand1, LLVMValueRef operand2) {
-	LLVMOpcode op1 = LLVMGetInstructionOpcode(operand1);
-	LLVMOpcode op2 = LLVMGetInstructionOpcode(operand2);
-	if (op1 != op2) return false;
-	if num_operands = LLVMGetNumOperands(instruction);
-}*/
-
-bool elimCommonSubexpr(LLVMBasicBlockRef bb) {
-	bool did_optimize = false;
-	for (LLVMValueRef instruction = LLVMGetFirstInstruction(bb); instruction; instruction = LLVMGetNextInstruction(instruction)) {
-		
-		LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-
-		// do not perform subexpression elimination on ALLOC
-		if (op == LLVMAlloca) {
-			continue;
-		}
-
-		int num_operands = LLVMGetNumOperands(instruction);
-		LLVMValueRef operands[num_operands];
-		for (int i = 0; i < num_operands; i++) {
-			LLVMValueRef operand = LLVMGetOperand(instruction, i);
-			operands[i] = operand;
-		}
-
-		LLVMValueRef next_instruction = LLVMGetNextInstruction(instruction);
-		while ( next_instruction ) {
-			LLVMOpcode next_op = LLVMGetInstructionOpcode(next_instruction);
-			int next_num_operands = LLVMGetNumOperands(next_instruction);
-			LLVMValueRef next_operands[num_operands];
-			for (int i = 0; i < num_operands; i++) {
-				LLVMValueRef next_operand = LLVMGetOperand(next_instruction, i);
-				next_operands[i] = next_operand;
-			}
-
-			// stop eliminating common expr if the subexpression is a LOAD and an operand is changed by a STORE
-			if (next_op == LLVMStore && op == LLVMLoad) {
-				bool is_operand_changed = false;
-				for (int i = 0; i < num_operands; i++) {
-					for (int j = 0; j < num_operands; j++) {
-						if (operands[i] != next_operands[j]) {
-							is_operand_changed = true;
-						}
-					}
-				}
-				if (is_operand_changed) {
-					break;
-				}
-			}
-
-			if (next_op == op && next_num_operands == num_operands) {
-
-				// order of operands does not matter for these two operations
-				if (op == LLVMAdd || op == LLVMMul) { 
-					if ((next_operands[0] == operands[0] && next_operands[1] == operands[1]) || (next_operands[0] == operands[1] && next_operands[1] == operands[0])) {
-						LLVMReplaceAllUsesWith(next_instruction, instruction);
-						did_optimize = true;
-					}
-				// order of operands does matter for the remaining operations
-				} else {
-					bool are_operands_equal = true;
-					for (int i = 0; i < num_operands; i++) {
-						if (next_operands[i] != operands[i]) {
-							are_operands_equal = false;
-							break;
-						}
-					}
-					if (are_operands_equal) {
-						LLVMReplaceAllUsesWith(next_instruction, instruction);
-						did_optimize = true;
-					}
-				}
-			}
-			next_instruction = LLVMGetNextInstruction(next_instruction);
-		}
-	}
-	return did_optimize;
+int vector_contains(vector<char*> *v, char *s, int start_from = 0) {
+    for (char* s2: *v) {
+        if (start_from <= 0 and strcmp(s, s2) == 0) return 1;
+        else start_from -= 1;
+    }
+    return 0;
 }
 
-bool elimDeadCode(LLVMBasicBlockRef bb) {
-	bool did_optimize = false;
-
-	for (LLVMValueRef instruction = LLVMGetFirstInstruction(bb); instruction; instruction = LLVMGetNextInstruction(instruction)) {
-		LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-
-		// do not perform subexpression elimination on STORE, CALL, BRANCH, or RET
-		if (op == LLVMStore || op == LLVMCall || op == LLVMRet || op == LLVMBr || op == LLVMAlloca) {
-			continue;
+int perform_analysis_on_val(astNode *node, char *func_param, vector<char*> *decl_list) {
+	switch(node->type){
+		case ast_stmt: {
+            astStmt stmt = node->stmt;
+            if (stmt.type != ast_call) {
+                printf("val is a stmt but not a call\n");
+                return -1;
+            }
+            if (strcmp(stmt.call.name, "read") != 0) {
+                printf("val is a stmt call but not a read call\n");
+                return -1;
+            }
+            return 0;
 		}
-
-		// check if this instruction is ever used
-		bool is_instruction_used = false;
-
-		LLVMValueRef next_instruction = LLVMGetNextInstruction(instruction);
-		while ( next_instruction ) { 
-			int next_num_operands = LLVMGetNumOperands(next_instruction);
-			for (int i = 0; i < next_num_operands; i++) {
-				LLVMValueRef next_operand = LLVMGetOperand(next_instruction, i);
-				if (next_operand == instruction) {
-					is_instruction_used = true;
-					break;
-				}
-			}
-			next_instruction = LLVMGetNextInstruction(next_instruction);
+		case ast_var: {
+            char *var_name = node->var.name;
+            if (vector_contains(decl_list, var_name) == 0 and strcmp(func_param, var_name) != 0) {
+                printf("%s referenced before declaration\n", var_name);
+                return -1;
+            }
+            return 0;
 		}
-
-		// if the instruction is not used, delete the instruction
-		if (!is_instruction_used) {
-			LLVMInstructionEraseFromParent(instruction);
-			did_optimize = true;
+		case ast_cnst:
+            return 0;
+		case ast_uexpr:
+            return perform_analysis_on_val(node->uexpr.expr, func_param, decl_list);
+		case ast_bexpr: {
+            if (perform_analysis_on_val(node->bexpr.lhs, func_param, decl_list) == -1) return -1;
+            if (perform_analysis_on_val(node->bexpr.rhs, func_param, decl_list) == -1) return -1;
+            return 0;
 		}
-	}
-	return did_optimize;
-}
-
-bool foldConstants(LLVMBasicBlockRef bb) {
-	bool did_optimize = false;
-
-	for (LLVMValueRef instruction = LLVMGetFirstInstruction(bb); instruction; instruction = LLVMGetNextInstruction(instruction)) {
-		LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-
-		if (op == LLVMAdd && LLVMIsConstant(LLVMGetOperand(instruction, 0)) && LLVMIsConstant(LLVMGetOperand(instruction, 1))) {
-			LLVMValueRef newConst = LLVMConstAdd(LLVMGetOperand(instruction,0), LLVMGetOperand(instruction,1));
-			LLVMReplaceAllUsesWith(instruction, newConst);
-			did_optimize = true;
-      	} else if (op == LLVMMul && LLVMIsConstant(LLVMGetOperand(instruction, 0)) && LLVMIsConstant(LLVMGetOperand(instruction, 1))) {
-			LLVMValueRef newConst = LLVMConstMul(LLVMGetOperand(instruction,0), LLVMGetOperand(instruction,1));
-			LLVMReplaceAllUsesWith(instruction, newConst);
-			did_optimize = true;
-      	} else if (op == LLVMSub && LLVMIsConstant(LLVMGetOperand(instruction, 0)) && LLVMIsConstant(LLVMGetOperand(instruction, 1))) {
-			LLVMValueRef newConst = LLVMConstSub(LLVMGetOperand(instruction,0), LLVMGetOperand(instruction,1));
-			LLVMReplaceAllUsesWith(instruction, newConst);
-			did_optimize = true;
-      	}
-	}
-	return did_optimize;
-}
-
-void optimize(LLVMValueRef function) {
-	// calculate predecessors
-	unordered_map<LLVMBasicBlockRef, set<LLVMBasicBlockRef>> predecessors;
-	for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-		LLVMValueRef terminator = LLVMGetBasicBlockTerminator(basic_block);
-		int num_successors = LLVMGetNumSuccessors(terminator);
-		for (int i = 0; i < num_successors; i++) {
-			LLVMBasicBlockRef successor = LLVMGetSuccessor(terminator, i);
-			predecessors[successor].insert(basic_block);
+		default: {
+            printf("val has incorrect type (not read, var, cnst, uexpr, or bexpr)\n");
+			return -1;
 		}
 	}
-	bool did_optimize_func;
-	do {
-		did_optimize_func = false;
-
-		// globally optimize
-		unordered_map<LLVMBasicBlockRef, set<LLVMValueRef>> gen;
-		unordered_map<LLVMValueRef, set<LLVMValueRef>> var_to_store_instructions;
-		unordered_map<LLVMBasicBlockRef, set<LLVMValueRef>> kill;
-		unordered_map<LLVMBasicBlockRef, set<LLVMValueRef>> in;
-		unordered_map<LLVMBasicBlockRef, set<LLVMValueRef>> out;
-		unordered_map<LLVMBasicBlockRef, set<LLVMValueRef>> old_out;
-		set<LLVMValueRef> marked_for_deletion;
-
-		// calculate gen set and var_to_store_instructions set out to gen
-		for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-			for (LLVMValueRef instruction = LLVMGetLastInstruction(basic_block); instruction; instruction = LLVMGetPreviousInstruction(instruction)) {
-				LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-				if (op == LLVMStore) {
-					LLVMValueRef var = LLVMGetOperand(instruction, 1);
-					var_to_store_instructions[var].insert(instruction);
-					bool is_var_in_gen = false;
-					for (LLVMValueRef gen_instruction : gen[basic_block]) {
-						LLVMValueRef gen_var = LLVMGetOperand(gen_instruction, 1);
-						if (gen_var == var) {
-							bool is_var_in_gen = true;
-							break;
-						}
-					}
-					if (!is_var_in_gen) {
-						gen[basic_block].insert(instruction);
-					}
-				}
-			}
-			out[basic_block].insert(gen[basic_block].begin(), gen[basic_block].end());
-		}
-
-		// calculate kill set
-		for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-			for (LLVMValueRef instruction = LLVMGetFirstInstruction(basic_block); instruction; instruction = LLVMGetNextInstruction(instruction)) {
-				LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-				if (op == LLVMStore) {
-					LLVMValueRef var = LLVMGetOperand(instruction, 1);
-					for (LLVMValueRef store_instruction : var_to_store_instructions[var]) {
-						if (store_instruction != instruction) {
-							kill[basic_block].insert(store_instruction);
-						}
-					}
-				}
-			}
-		}
-
-		int did_out_change;
-		do {
-			// calculate in
-			for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-				in[basic_block].clear();
-				for (LLVMBasicBlockRef predecessor : predecessors[basic_block]) 
-				{
-					in[basic_block].insert(out[predecessor].begin(), out[predecessor].end());
-				}  
-			}
-			
-			// calculate out
-			did_out_change = false;
-			for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-				old_out[basic_block].clear();
-				old_out[basic_block].insert(out[basic_block].begin(), out[basic_block].end());
-				out[basic_block].clear();
-				out[basic_block].insert(in[basic_block].begin(), in[basic_block].end());
-				for (LLVMValueRef killed : kill[basic_block]) {
-					out[basic_block].erase(killed);
-				}
-				out[basic_block].insert(gen[basic_block].begin(), gen[basic_block].end());
-				if (old_out != out) {
-					did_out_change = true;
-				}
-			}
-			
-		} while (did_out_change);
-		
-		// use in and out to optimize
-		
-		for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function); basic_block; basic_block = LLVMGetNextBasicBlock(basic_block)) {
-			
-			for (LLVMValueRef instruction = LLVMGetFirstInstruction(basic_block); instruction; instruction = LLVMGetNextInstruction(instruction)) {
-				LLVMOpcode op = LLVMGetInstructionOpcode(instruction);
-				if (op == LLVMStore) {
-					LLVMValueRef var = LLVMGetOperand(instruction, 1);
-					// remove all stores killed by instruction from R
-					set<LLVMValueRef> store_instructions = var_to_store_instructions[var];
-					for (LLVMValueRef store_instruction : store_instructions) {
-						if (store_instruction != instruction) {
-							in[basic_block].erase(store_instruction);
-						}
-					}
-					// add instruction to R
-					in[basic_block].insert(instruction);
-				}
-				else if (op == LLVMLoad) {
-					LLVMValueRef var = LLVMGetOperand(instruction, 0);
-					LLVMValueRef prev_val = NULL;
-					bool should_replace_prev_val = false;
-					// check all stores in R to the same address we are loading from to see if they are all the same constant
-					for (LLVMValueRef store_instruction : in[basic_block]) {
-						LLVMValueRef store_var = LLVMGetOperand(store_instruction, 1);
-						if (var == store_var) {
-							LLVMValueRef val = LLVMGetOperand(store_instruction, 0);
-							if (LLVMIsConstant(val)) {
-								if (should_replace_prev_val) {
-									if (val != prev_val) {
-										should_replace_prev_val = false;
-									}
-								} else if (prev_val == NULL) {
-									should_replace_prev_val = true;
-									prev_val = val;
-								}
-							}
-						}
-					}
-					if (should_replace_prev_val) {
-						marked_for_deletion.insert(instruction);
-						LLVMReplaceAllUsesWith(instruction, prev_val);
-						did_optimize_func = true;
-					}
-				}
-				for (LLVMValueRef instruction : marked_for_deletion) {
-					LLVMInstructionEraseFromParent(instruction);
-				}
-				marked_for_deletion.clear();
-			}
-
-		}
-		
-		
-		// locally optimize
-		for (LLVMBasicBlockRef basic_block = LLVMGetFirstBasicBlock(function);
-				basic_block;
-				basic_block = LLVMGetNextBasicBlock(basic_block)) {
-			
-			bool did_optimize_bb;
-			do {
-				bool did_elim_common_subexpr = elimCommonSubexpr(basic_block);
-				bool did_elim_dead_code = elimDeadCode(basic_block);
-				bool did_fold_constants = foldConstants(basic_block);
-				did_optimize_bb = did_elim_common_subexpr || did_elim_dead_code || did_fold_constants;
-				did_optimize_func = did_optimize_func || did_optimize_bb;
-			} while (did_optimize_bb);
-		}
-	} while (did_optimize_func);
 }
 
-void walkFunctions(LLVMModuleRef module){
-	for (LLVMValueRef function =  LLVMGetFirstFunction(module); 
-			function; 
-			function = LLVMGetNextFunction(function)) {
-
-		optimize(function);
- 	}
+int perform_analysis_on_stmt(astNode *node, char *func_param, vector<char*> *decl_list, vector<int> *decl_list_scope_start_sizes) {
+    astStmt stmt = node->stmt; 
+	switch(stmt.type){
+		case ast_call: {
+            if (stmt.call.param != NULL) return perform_analysis_on_val(stmt.call.param, func_param, decl_list);
+            return 0;
+        }
+		case ast_ret:
+            return perform_analysis_on_val(stmt.ret.expr, func_param, decl_list);
+		case ast_asgn:	{
+            if (perform_analysis_on_val(stmt.asgn.lhs, func_param, decl_list) == -1) return -1;
+            if (perform_analysis_on_val(stmt.asgn.rhs, func_param, decl_list) == -1) return -1;
+            return 0;
+        }
+		case ast_decl:	{
+            if (vector_contains(decl_list, stmt.decl.name, decl_list_scope_start_sizes->back()) == 1) {
+                printf("multiple declaration of %s\n", stmt.decl.name);
+                return -1;
+            }
+            if (strcmp(func_param, stmt.decl.name) == 0) {
+                printf("%s is already a param\n", stmt.decl.name);
+                return -1;
+            }
+            decl_list->push_back(stmt.decl.name);
+            return 0;
+        }
+		case ast_block: {
+            decl_list_scope_start_sizes->push_back(decl_list->size());
+            vector<astNode*> slist = *(stmt.block.stmt_list);
+			vector<astNode*>::iterator it = slist.begin();
+            while (it != slist.end()){
+                if (perform_analysis_on_stmt(*it, func_param, decl_list, decl_list_scope_start_sizes) == -1) return -1;
+                it++;
+            }
+            int scope_start_size = decl_list_scope_start_sizes->back();
+            decl_list_scope_start_sizes->pop_back();
+            decl_list->erase(decl_list->begin()+scope_start_size, decl_list->end());
+            return 0;
+        }
+		case ast_while: {
+            if (perform_analysis_on_val(stmt.whilen.cond->rexpr.lhs, func_param, decl_list) == -1) return -1;
+            if (perform_analysis_on_val(stmt.whilen.cond->rexpr.rhs, func_param, decl_list) == -1) return -1;
+            decl_list_scope_start_sizes->push_back(decl_list->size());
+            if (perform_analysis_on_stmt(stmt.whilen.body, func_param, decl_list, decl_list_scope_start_sizes) == -1) return -1;
+            int scope_start_size = decl_list_scope_start_sizes->back();
+            decl_list_scope_start_sizes->pop_back();
+            decl_list->erase(decl_list->begin()+scope_start_size, decl_list->end());
+            return 0;
+		}
+		case ast_if: {
+            if (perform_analysis_on_val(stmt.ifn.cond->rexpr.lhs, func_param, decl_list) == -1) return -1;
+            if (perform_analysis_on_val(stmt.ifn.cond->rexpr.rhs, func_param, decl_list) == -1) return -1;
+            decl_list_scope_start_sizes->push_back(decl_list->size());
+            if (perform_analysis_on_stmt(stmt.ifn.if_body, func_param, decl_list, decl_list_scope_start_sizes) == -1) return -1;
+            int scope_start_size = decl_list_scope_start_sizes->back();
+            decl_list_scope_start_sizes->pop_back();
+            decl_list->erase(decl_list->begin()+scope_start_size, decl_list->end());
+            if (stmt.ifn.else_body != NULL) {
+                decl_list_scope_start_sizes->push_back(decl_list->size());
+                if (perform_analysis_on_stmt(stmt.ifn.else_body, func_param, decl_list, decl_list_scope_start_sizes) == -1) return -1;
+                int scope_start_size = decl_list_scope_start_sizes->back();
+                decl_list_scope_start_sizes->pop_back();
+                decl_list->erase(decl_list->begin()+scope_start_size, decl_list->end());
+            }
+            return 0;
+		}
+        default: {
+            printf("stmt has incorrect type\n");
+            return -1;
+        }
+    }
 }
 
-int optimize_llvm(char* ll_file)
-{
-	LLVMModuleRef m;
+// return 0 if success, 1 if failure
+// prints error details
+int perform_analysis(astNode *rootAst) {
+	vector<char*> *decl_list;
+	vector<int> *decl_list_scope_start_sizes;
+	decl_list = new vector<char*> ();
+	decl_list_scope_start_sizes = new vector<int> ();
+    int result;
+    astFunc func = rootAst->prog.func->func;
+    if (func.param == NULL) {
+        result = perform_analysis_on_stmt(func.body, NULL, decl_list, decl_list_scope_start_sizes);
+    } else {
+        result = perform_analysis_on_stmt(func.body, func.param->var.name, decl_list, decl_list_scope_start_sizes);
+    }
+	delete(decl_list);
+	delete(decl_list_scope_start_sizes);
+    return result;
+}
 
-	m = createLLVMModel(ll_file);
+int change_cost = 1;
+int delete_cost = 2;
+int add_cost = 2;
 
-	if (m != NULL){
-		walkFunctions(m);
-		LLVMPrintModuleToFile (m, "output_optimized.ll", NULL);
-		LLVMDisposeModule(m);
-		LLVMShutdown();
-		return 0;
-	}
-	else {
-	    fprintf(stderr, "m is NULL\n");
-		return -1;
+string get_tree_string(astNode *astNode) {
+	switch(node->type){
+		case ast_func: {
+    		astFunc func = node->func;
+			if (func.param == NULL) {
+				result = perform_analysis_on_stmt(func.body, NULL, decl_list, decl_list_scope_start_sizes);
+			} else {
+				result = perform_analysis_on_stmt(func.body, func.param->var.name, decl_list, decl_list_scope_start_sizes);
+			}
+		}
+		case ast_stmt: {
+            astStmt stmt = node->stmt;
+            if (stmt.type != ast_call) {
+                printf("val is a stmt but not a call\n");
+                return -1;
+            }
+            if (strcmp(stmt.call.name, "read") != 0) {
+                printf("val is a stmt call but not a read call\n");
+                return -1;
+            }
+            return 0;
+		}
+		case ast_var: {
+            char *var_name = node->var.name;
+            if (vector_contains(decl_list, var_name) == 0 and strcmp(func_param, var_name) != 0) {
+                printf("%s referenced before declaration\n", var_name);
+                return -1;
+            }
+            return 0;
+		}
+		case ast_cnst:
+            return 0;
+		case ast_uexpr:
+            return perform_analysis_on_val(node->uexpr.expr, func_param, decl_list);
+		case ast_bexpr: {
+            if (perform_analysis_on_val(node->bexpr.lhs, func_param, decl_list) == -1) return -1;
+            if (perform_analysis_on_val(node->bexpr.rhs, func_param, decl_list) == -1) return -1;
+            return 0;
+		}
+		default: {
+            printf("val has incorrect type (not read, var, cnst, uexpr, or bexpr)\n");
+			return -1;
+		}
 	}
 }
+
+int calculate_similarity(astNode *rootAst1, astNode *rootAst2) {
+	string tree1 = get_tree_string(astNode1->prog.func);
+	string tree2 = get_tree_string(astNode2->prog.func);
+}
+

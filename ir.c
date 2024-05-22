@@ -194,8 +194,7 @@ LLVMValueRef genIRExpr (astNode *node, LLVMBuilderRef builder) {
 					break;
 				}
 				case divide: {
-            		printf("genIRExpr bexpr has incorrect op type divide\n");
-					val = LLVMBuildMul(builder, lhs, rhs, "");
+					val = LLVMBuildSDiv(builder, lhs, rhs, "");
 					break;
 				}
 				case uminus: {
@@ -245,7 +244,8 @@ LLVMValueRef genIRExpr (astNode *node, LLVMBuilderRef builder) {
 			// Return the LLVMValueRef of the instruction generated in step C.
 			return val;
 		}
-		case ast_call: {
+		case ast_stmt: {
+			// stmt must be a read call
 			// Generate a call instruction to read function.
 			LLVMValueRef *read_args = NULL;
 			LLVMValueRef read_call = LLVMBuildCall2(builder, ret_read, func_read, read_args, 0, "");
