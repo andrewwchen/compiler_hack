@@ -6,9 +6,11 @@ int func(int i){
 	int	b;
 	int	d;
 	a = 1;
-	b = 2;
-	d = 2;
+	b = 1;
+	d = 1;
+	d = d+a;
+	d = d+b;
 
-	return d;
+	return a;
 
 }
